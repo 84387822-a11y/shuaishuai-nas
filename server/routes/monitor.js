@@ -532,6 +532,64 @@ async function fetchJson(url, timeoutMs) {
   }
 }
 
+/**
+ * wttr.in（WorldWeatherOnline 码）→ 我们前端使用的 WMO 码 + 中文描述。
+ * 国内网络常无法访问 api.open-meteo.com，但 wttr.in 通常可用，作为备用源。
+ */
+const WWO_WMO = {
+  113: [0, '晴'], 116: [2, '多云'], 119: [3, '阴'], 122: [3, '阴'], 143: [45, '薄雾'],
+  149: [45, '烟霾'], 176: [51, '可能有阵雨'], 179: [71, '可能有阵雪'], 182: [66, '可能有雨夹雪'],
+  185: [56, '可能有冻毛毛雨'], 200: [95, '可能有雷暴'], 227: [71, '扬雪'], 230: [75, '暴风雪'],
+  248: [45, '雾'], 260: [48, '冻雾'], 263: [51, '零星小雨'], 266: [53, '小雨'], 281: [56, '冻毛毛雨'],
+  284: [57, '强冻毛毛雨'], 293: [61, '零星小雨'], 296: [61, '小雨'], 299: [63, '间歇中雨'],
+  302: [63, '中雨'], 305: [65, '间歇大雨'], 308: [65, '大雨'], 311: [66, '小冻雨'], 314: [67, '冻雨'],
+  317: [66, '小雨夹雪'], 320: [67, '雨夹雪'], 323: [71, '零星小雪'], 326: [71, '小雪'],
+  329: [73, '零星中雪'], 332: [73, '中雪'], 335: [75, '零星大雪'], 338: [75, '大雪'],
+  350: [77, '冰粒'], 353: [80, '小阵雨'], 356: [81, '中到大阵雨'], 359: [82, '暴雨'],
+  362: [85, '小阵雨夹雪'], 365: [86, '中到大雨夹雪'], 368: [85, '小阵雪'], 371: [86, '中到大阵雪'],
+  374: [77, '小冰粒'], 377: [77, '中到大冰粒'], 386: [95, '雷阵雨'], 389: [95, '强雷阵雨'],
+  392: [95, '雷阵雪'], 395: [95, '强雷阵雪'],
+};
+
+function wwoInfo(code) {
+  const hit = WWO_WMO[Number(code)];
+  return hit ? { wmo: hit[0], text: hit[1] } : { wmo: 3, text: '阴' };
+}
+
+/** 备用源：wttr.in（按经纬度取，避免城市名歧义）。 */
+async function fetchWttr(config) {
+  const url = `https://wttr.in/${config.latitude},${config.longitude}?format=j1`;
+  const j = await fetchJson(url, WEATHER_TIMEOUT);
+  const c = (j.current_condition && j.current_condition[0]) || {};
+  const cur = wwoInfo(c.weatherCode);
+
+  const days = (Array.isArray(j.weather) ? j.weather : []).slice(0, 3).map((d) => {
+    const hourly = Array.isArray(d.hourly) ? d.hourly : [];
+    const pick = hourly[4] || hourly[0] || {};
+    const info = wwoInfo(pick.weatherCode);
+    return {
+      date: d.date || '',
+      condition: info.text,
+      code: info.wmo,
+      tempMax: Number.isFinite(Number(d.maxtempC)) ? Math.round(Number(d.maxtempC)) : null,
+      tempMin: Number.isFinite(Number(d.mintempC)) ? Math.round(Number(d.mintempC)) : null,
+    };
+  });
+
+  return {
+    city: config.city,
+    condition: cur.text,
+    code: cur.wmo,
+    temperature: Number.isFinite(Number(c.temp_C)) ? Number(c.temp_C) : null,
+    feelsLike: Number.isFinite(Number(c.FeelsLikeC)) ? Number(c.FeelsLikeC) : null,
+    humidity: Number.isFinite(Number(c.humidity)) ? Number(c.humidity) : null,
+    windSpeed: Number.isFinite(Number(c.windspeedKmph)) ? Number(c.windspeedKmph) : null,
+    unit: '°C',
+    days,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 /** 只取当前天气 + 未来 3 天预报，字段精简。 */
 function toWeatherOut(forecast, city) {
   const c = (forecast && forecast.current) || {};
@@ -607,6 +665,19 @@ async function weatherStatus(ctx, saveCity) {
 async function loadWeather(cfg) {
   const config = cfg || loadWeatherConfig();
   if (!config) return { error: '未配置天气城市', cached: 0 };
+
+  // 允许强制指定数据源：SS_WEATHER_PROVIDER=wttr 时跳过 Open-Meteo
+  if (String(process.env.SS_WEATHER_PROVIDER || '').toLowerCase() === 'wttr') {
+    try {
+      const out = await fetchWttr(config);
+      weatherCache = { ts: Date.now(), data: out };
+      return { ...out, source: 'wttr' };
+    } catch {
+      return { error: '天气获取失败（wttr.in 不可达，请检查外网）', cached: Date.now() - weatherCache.ts };
+    }
+  }
+
+  // 主源：Open-Meteo（海外/可访问环境）
   try {
     const url =
       `${FORECAST_URL}?latitude=${config.latitude}&longitude=${config.longitude}` +
@@ -617,7 +688,17 @@ async function loadWeather(cfg) {
     weatherCache = { ts: Date.now(), data: out };
     return { ...out, source: 'fresh' };
   } catch (err) {
-    return { error: '天气获取失败（本机需能访问外网）', cached: Date.now() - weatherCache.ts };
+    // 备用源：wttr.in（国内网络通常可访问）
+    try {
+      const out = await fetchWttr(config);
+      weatherCache = { ts: Date.now(), data: out };
+      return { ...out, source: 'wttr' };
+    } catch (err2) {
+      return {
+        error: '天气获取失败（Open-Meteo 与备用源 wttr.in 均不可达，请检查外网）',
+        cached: Date.now() - weatherCache.ts,
+      };
+    }
   }
 }
 

@@ -146,6 +146,7 @@ npm start
 | `SS_PASSWORD` | 空 | 设置后所有接口需要登录 |
 | `SS_SECRET` | 随机 | Cookie 签名密钥；容器重建后建议固定，否则需重新登录 |
 | `SS_LOG` | `1` | 设为 `0` 关闭访问日志 |
+| `SS_WEATHER_PROVIDER` | `auto` | 天气数据源。`auto` 先试 Open-Meteo，失败自动回退 `wttr.in`；设为 `wttr` 可强制只用备用源（国内网络访问 Open-Meteo 预报接口时常被阻断） |
 
 > `SS_ROOTS` 是硬边界：路径解析后会与授权目录做包含校验，跨目录、`..`、符号链接逃逸都会被 403。
 

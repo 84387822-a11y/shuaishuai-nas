@@ -1,6 +1,6 @@
 {
   "name": "shuaishuai-nas",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "NAS助手 - 面向飞牛 fnOS 玩家的一体化本地 Web 工具箱",
   "main": "server/index.js",
