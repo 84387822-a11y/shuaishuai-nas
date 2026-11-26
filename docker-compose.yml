@@ -1,0 +1,32 @@
+# 帅帅 NAS 助手 —— Docker Compose 部署示例
+# 使用前请把 /vol1/media 换成你真实的媒体目录，并按需修改端口。
+
+services:
+  shuaishuai-nas:
+    build: .
+    image: tongtongshuaishuai/nas-helper:latest
+    container_name: shuaishuai-nas
+    restart: unless-stopped
+    ports:
+      - "8620:8620"
+    environment:
+      TZ: Asia/Shanghai
+      # 授权目录：只有这里列出的路径才允许扫描，多个用 : 分隔
+      SS_ROOTS: /vol1/media:/vol2/media
+      # 强烈建议设置访问密码（设置后所有接口需要登录）
+      # SS_PASSWORD: "change-me-please"
+      SS_DATA_DIR: /data
+    volumes:
+      - /vol1/media:/vol1/media:ro
+      - /vol2/media:/vol2/media:ro
+      - ./data:/data
+    # ---- 需要「硬盘 SMART」时，取消下面注释（会提高容器权限）----
+    # privileged: true
+    # devices:
+    #   - /dev/sda:/dev/sda
+    #   - /dev/sdb:/dev/sdb
+
+# 说明：
+# 1. 默认非 root 运行；SMART 需要 privileged + /dev 挂载，按需开启。
+# 2. 媒体目录建议只读挂载（:ro），避免误改原文件。
+# 3. 不要把 8620 直接映射到公网；远程访问请走 fnOS 反向代理 + HTTPS。

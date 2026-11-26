@@ -1,0 +1,19 @@
+#!/bin/bash
+# 卸载后：按向导选择决定是否删除运行数据。默认为保留。
+
+set -u
+
+DATA_DIR="${TRIM_PKGVAR:-/var/apps/shuaishuai.nas/var}"
+ETC_DIR="${TRIM_PKGETC:-/var/apps/shuaishuai.nas/etc}"
+
+if [ "${wizard_delete_data:-keep}" = "delete" ]; then
+  # 双重保护：只删除明确属于本应用的目录
+  case "${DATA_DIR}" in
+    */shuaishuai.nas/var|*/shuaishuai.nas*) rm -rf "${DATA_DIR}" ;;
+  esac
+  case "${ETC_DIR}" in
+    */shuaishuai.nas/etc|*/shuaishuai.nas*) rm -rf "${ETC_DIR}" ;;
+  esac
+fi
+
+exit 0

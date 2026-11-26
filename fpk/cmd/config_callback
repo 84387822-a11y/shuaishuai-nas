@@ -1,0 +1,35 @@
+#!/bin/bash
+# 配置变更后：按向导更新访问密码，然后重启服务。
+
+set -u
+
+export PATH=/var/apps/nodejs_v22/target/bin:$PATH
+
+APP_DIR="${TRIM_APPDEST:-/var/apps/shuaishuai.nas/target}"
+DATA_DIR="${TRIM_PKGVAR:-/var/apps/shuaishuai.nas/var}"
+ETC_DIR="${TRIM_PKGETC:-/var/apps/shuaishuai.nas/etc}"
+AUTH_FILE="${ETC_DIR}/auth.env"
+
+mkdir -p "${ETC_DIR}" 2>/dev/null
+
+if [ "${wizard_disable_auth:-false}" = "true" ]; then
+  rm -f "${AUTH_FILE}"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] access password disabled by config wizard" >> "${DATA_DIR}/app.log" 2>/dev/null
+elif [ -n "${wizard_password:-}" ]; then
+  if node "${APP_DIR}/server/lib/set-password.js" "${AUTH_FILE}" "${wizard_password}" 2>>"${DATA_DIR}/app.log"; then
+    chmod 600 "${AUTH_FILE}" 2>/dev/null
+  else
+    echo "更新访问密码失败，请检查应用目录权限。" > "${TRIM_TEMP_LOGFILE:-/dev/null}"
+  fi
+fi
+
+# 授权目录变更：持久化到 etc/paths.env（包括清空授权的情况）
+if [ "${TRIM_DATA_ACCESSIBLE_PATHS+x}" = "x" ]; then
+  node "${APP_DIR}/server/lib/write-env.js" "${ETC_DIR}/paths.env" SS_ROOTS "${TRIM_DATA_ACCESSIBLE_PATHS}" 2>>"${DATA_DIR}/app.log" || true
+fi
+
+# 先停再启会中断正在用的页面；这里只保证服务在运行，
+# 新授权路径由应用每 2 秒热加载 paths.env，密码同理。
+"${APP_DIR}/../cmd/main" start 2>/dev/null || true
+
+exit 0

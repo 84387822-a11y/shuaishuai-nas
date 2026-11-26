@@ -1,0 +1,8 @@
+{
+  "defaults": {
+    "run-as": "package"
+  },
+  "username": "shuaishuainas",
+  "groupname": "shuaishuainas",
+  "join-groups": ["disk", "docker"]
+}

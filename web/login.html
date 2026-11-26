@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>登录 · NAS助手</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<style>
+  :root {
+    --bg: #070a12; --panel: #0e1626; --border: rgba(148, 173, 214, .16);
+    --text: #e7eefb; --muted: #7787a3; --accent: #4dabf7; --danger: #f87171;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background:
+      radial-gradient(900px 600px at 70% 0%, rgba(77, 171, 247, .14), transparent 60%),
+      radial-gradient(700px 500px at 0% 100%, rgba(167, 139, 250, .12), transparent 55%),
+      var(--bg);
+    color: var(--text);
+    font: 14px/1.6 "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+    display: grid; place-items: center; padding: 24px;
+  }
+  .box {
+    width: 100%; max-width: 380px; padding: 30px 28px 26px;
+    background: rgba(14, 22, 38, .82); border: 1px solid var(--border);
+    border-radius: 20px; box-shadow: 0 30px 80px rgba(0, 0, 0, .55);
+    backdrop-filter: blur(18px);
+  }
+  .logo { width: 54px; height: 54px; border-radius: 15px; display: block; margin-bottom: 18px; box-shadow: 0 8px 26px rgba(77, 171, 247, .3); }
+  h1 { font-size: 19px; margin: 0 0 4px; font-weight: 650; }
+  p.sub { margin: 0 0 22px; font-size: 12px; color: var(--muted); }
+  label { display: block; font-size: 12px; color: #aab8d0; margin-bottom: 7px; }
+  input {
+    width: 100%; padding: 11px 13px; border-radius: 11px; font: inherit;
+    background: rgba(0, 0, 0, .3); border: 1px solid var(--border); color: var(--text);
+    outline: none; transition: .16s;
+  }
+  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(77, 171, 247, .14); }
+  button {
+    width: 100%; margin-top: 16px; padding: 11px; border: 0; border-radius: 11px;
+    font: inherit; font-weight: 600; color: #fff; cursor: pointer;
+    background: linear-gradient(135deg, #4dabf7, #7c3aed);
+    box-shadow: 0 8px 24px rgba(77, 171, 247, .3);
+  }
+  button:disabled { opacity: .6; cursor: wait; }
+  .err { display: none; margin-top: 12px; font-size: 12px; color: var(--danger); }
+  .err.show { display: block; }
+  .foot { margin-top: 20px; font-size: 10.5px; color: var(--muted); text-align: center; line-height: 1.6; }
+</style>
+</head>
+<body>
+  <form class="box" id="form">
+    <img class="logo" src="/logo.png" alt="">
+    <h1>NAS助手</h1>
+    <p class="sub">该实例已启用访问密码，请输入后继续</p>
+    <label for="pw">访问密码</label>
+    <input id="pw" type="password" autocomplete="current-password" autofocus placeholder="SS_PASSWORD">
+    <button type="submit" id="btn">进入工具箱</button>
+    <div class="err" id="err"></div>
+    <div class="foot">密码由部署环境变量或安装向导设置<br>仅用于局域网自托管，请勿直接暴露到公网</div>
+  </form>
+
+<script>
+  var form = document.getElementById('form');
+  var pw = document.getElementById('pw');
+  var btn = document.getElementById('btn');
+  var err = document.getElementById('err');
+
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    err.classList.remove('show');
+    btn.disabled = true;
+    btn.textContent = '验证中…';
+    try {
+      var res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw.value })
+      });
+      var data = await res.json();
+      if (res.ok && data.ok) {
+        location.href = '/';
+        return;
+      }
+      err.textContent = data.error || '密码不正确';
+      err.classList.add('show');
+      pw.select();
+    } catch (ex) {
+      err.textContent = '无法连接服务，请确认容器/应用正在运行';
+      err.classList.add('show');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '进入工具箱';
+    }
+  });
+</script>
+</body>
+</html>

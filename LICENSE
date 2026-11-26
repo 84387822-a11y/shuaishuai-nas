@@ -1,0 +1,31 @@
+MIT License
+
+Copyright (c) 2026 统帅帅
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+附加声明（非许可证条款，但请务必阅读）：
+
+1. 本软件仅提供配置辅助、目录规范与模板生成能力，不内置、不提供、不下载、
+   不分发任何影视资源、音乐资源、音源、字幕或刮削数据。
+2. 使用者应确保对自己管理的媒体文件拥有合法权利，并遵守所在地法律法规。
+3. 本软件按「现状」提供，不对数据丢失、刮削结果、第三方服务可用性作任何担保。
+   执行批量重命名等写操作前，请自行做好备份。

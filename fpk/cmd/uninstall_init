@@ -1,0 +1,7 @@
+#!/bin/bash
+# 卸载前：先停止服务，避免遗留进程占用端口。
+
+set -u
+
+"${TRIM_APPDEST:-/var/apps/shuaishuai.nas/target}/../cmd/main" stop 2>/dev/null || true
+exit 0

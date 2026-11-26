@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <meta name="description" content="NAS助手 —— 面向飞牛 fnOS 玩家的一体化本地 Web 工具箱">
+  <title>NAS助手</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/logo.png">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <img class="brand-mark" src="/logo.png" alt="NAS助手" width="38" height="38">
+        <div class="brand-text">
+          <strong>NAS助手</strong>
+          <span>fnOS Toolbox</span>
+        </div>
+      </div>
+      <nav class="nav" id="nav"></nav>
+      <div class="sidebar-foot">
+        <div class="sysline" id="sysline">正在读取系统信息…</div>
+        <div class="foot-links">
+          <a href="#/about">关于与免责</a>
+          <span id="ver-line">v1.0.0</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-title">
+          <h1 id="page-title">应用中心</h1>
+          <p id="page-desc">不用懂 Docker，一键部署常用应用</p>
+        </div>
+        <div class="topbar-right">
+          <span class="pill" id="auth-pill">本地运行</span>
+          <button class="icon-btn" id="theme-btn" title="切换主题" aria-label="切换主题">🌙</button>
+        </div>
+      </header>
+      <div class="view" id="view"></div>
+      <footer class="footer">
+        NAS助手 · 只做配置辅助与模板生成，不内置资源与音源 · 请遵守当地版权法规
+      </footer>
+    </main>
+  </div>
+  <div id="toasts" class="toasts"></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

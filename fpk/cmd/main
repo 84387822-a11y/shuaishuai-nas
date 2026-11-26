@@ -1,0 +1,184 @@
+#!/bin/bash
+# 帅帅 NAS 助手 —— 应用生命周期脚本
+# 约定：start/stop 成功返回 0；status 运行中返回 0，未运行返回 3。
+
+set -u
+
+APP_DIR="${TRIM_APPDEST:-/var/apps/shuaishuai.nas/target}"
+DATA_DIR="${TRIM_PKGVAR:-/var/apps/shuaishuai.nas/var}"
+ETC_DIR="${TRIM_PKGETC:-/var/apps/shuaishuai.nas/etc}"
+PORT="${TRIM_SERVICE_PORT:-8620}"
+# 只使用用户在「应用设置 → 可访问的文件」里授权的路径；
+# 未授权时为空（不是回退到常见目录），避免越权扫描
+ROOTS="${TRIM_DATA_ACCESSIBLE_PATHS:-}"
+LOG_FILE="${DATA_DIR}/app.log"
+PID_FILE="${DATA_DIR}/app.pid"
+LOGFILE="${TRIM_TEMP_LOGFILE:-/dev/null}"
+
+log() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "${LOG_FILE}" 2>/dev/null
+}
+
+# fnOS 的 Node 运行时位置可能随版本变化，逐个兜底，避免因为 PATH 写死而启动失败
+find_node() {
+  if command -v node > /dev/null 2>&1; then
+    command -v node
+    return 0
+  fi
+  local p
+  for p in \
+    /var/apps/nodejs_v22/target/bin/node \
+    /var/apps/nodejs_v20/target/bin/node \
+    /var/apps/nodejs_v18/target/bin/node \
+    /usr/local/bin/node \
+    /usr/bin/node; do
+    if [ -x "${p}" ]; then
+      echo "${p}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+is_running() {
+  [ -f "${PID_FILE}" ] || return 1
+  local pid
+  pid=$(tr -d '[:space:]' < "${PID_FILE}" 2>/dev/null)
+  [ -n "${pid}" ] || return 1
+  kill -0 "${pid}" 2>/dev/null
+}
+
+# 把失败原因 + 最近日志写进系统可见日志，应用中心会弹窗展示
+report_failure() {
+  local reason="$1"
+  {
+    echo "${reason}"
+    echo ""
+    echo "--- 诊断信息 ---"
+    echo "应用目录: ${APP_DIR}"
+    echo "数据目录: ${DATA_DIR}"
+    echo "监听端口: ${PORT}"
+    echo "Node: ${NODE_BIN:-未找到}"
+    echo "授权目录: ${ROOTS}"
+    echo ""
+    echo "--- 最近日志（${LOG_FILE}）---"
+    tail -n 30 "${LOG_FILE}" 2>/dev/null || echo "（暂无日志）"
+  } > "${LOGFILE}"
+}
+
+start_app() {
+  if is_running; then
+    log "already running (pid $(cat "${PID_FILE}"))"
+    return 0
+  fi
+
+  mkdir -p "${DATA_DIR}" 2>/dev/null
+
+  NODE_BIN=$(find_node) || true
+  if [ -z "${NODE_BIN:-}" ]; then
+    report_failure "缺少 Node.js 运行时（依赖 nodejs_v22），请在应用中心确认依赖已安装。"
+    return 1
+  fi
+  if [ ! -f "${APP_DIR}/server/index.js" ]; then
+    report_failure "应用文件不完整，缺少 server/index.js。请尝试重新安装。"
+    return 1
+  fi
+
+  # 访问密码由安装/配置向导写入，权限 600；不存在则不启用登录
+  if [ -f "${ETC_DIR}/auth.env" ]; then
+    # shellcheck disable=SC1090
+    . "${ETC_DIR}/auth.env"
+  fi
+
+  # 授权目录持久化文件：以文件内容为准（包括「一个都没授权」的空值）
+  if [ -f "${ETC_DIR}/paths.env" ]; then
+    # shellcheck disable=SC1090
+    . "${ETC_DIR}/paths.env"
+    if [ "${SS_ROOTS+x}" = "x" ]; then
+      ROOTS="${SS_ROOTS}"
+    fi
+  fi
+
+  log "starting with ${NODE_BIN} on port ${PORT}"
+  log "authorized roots: ${ROOTS}"
+
+  cd "${APP_DIR}" || {
+    report_failure "无法进入应用目录：${APP_DIR}"
+    return 1
+  }
+
+  SS_PORT="${PORT}" \
+  SS_HOST="0.0.0.0" \
+  SS_DATA_DIR="${DATA_DIR}" \
+  SS_ROOTS="${ROOTS}" \
+  SS_PASSWORD="${SS_PASSWORD:-}" \
+  SS_AUTH_FILE="${ETC_DIR}/auth.env" \
+  SS_PATHS_FILE="${ETC_DIR}/paths.env" \
+  TZ="${TZ:-Asia/Shanghai}" \
+    nohup "${NODE_BIN}" "${APP_DIR}/server/index.js" >> "${LOG_FILE}" 2>&1 &
+
+  echo $! > "${PID_FILE}"
+
+  local i=0
+  while [ "${i}" -lt 20 ]; do
+    sleep 0.5
+    if is_running; then
+      # 再观察半秒，排除启动后立刻崩溃的情况
+      sleep 0.5
+      if is_running; then
+        log "started pid $(cat "${PID_FILE}")"
+        return 0
+      fi
+      report_failure "应用启动后立即退出，通常是端口被占用或权限不足。"
+      return 1
+    fi
+    i=$((i + 1))
+  done
+
+  report_failure "应用启动超时（10 秒）。"
+  return 1
+}
+
+stop_app() {
+  if ! is_running; then
+    rm -f "${PID_FILE}"
+    return 0
+  fi
+
+  local pid
+  pid=$(tr -d '[:space:]' < "${PID_FILE}")
+  log "stopping pid ${pid}"
+  kill -TERM "${pid}" 2>/dev/null
+
+  local i=0
+  while kill -0 "${pid}" 2>/dev/null && [ "${i}" -lt 20 ]; do
+    sleep 0.5
+    i=$((i + 1))
+  done
+  if kill -0 "${pid}" 2>/dev/null; then
+    kill -KILL "${pid}" 2>/dev/null
+  fi
+
+  rm -f "${PID_FILE}"
+  log "stopped"
+  return 0
+}
+
+case "${1:-}" in
+  start)
+    start_app || exit 1
+    ;;
+  stop)
+    stop_app || exit 1
+    ;;
+  status)
+    if is_running; then
+      exit 0
+    else
+      exit 3
+    fi
+    ;;
+  *)
+    exit 1
+    ;;
+esac

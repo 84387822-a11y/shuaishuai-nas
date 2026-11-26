@@ -1,0 +1,23 @@
+{
+  "name": "shuaishuai-nas",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NAS助手 - 面向飞牛 fnOS 玩家的一体化本地 Web 工具箱",
+  "main": "server/index.js",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js",
+    "check": "node --check server/index.js && node scripts/check-all.mjs",
+    "build:fpk": "node scripts/build-fpk.mjs",
+    "verify:fpk": "node scripts/verify-fpk.mjs",
+    "release": "node scripts/release.mjs",
+    "icons": "python scripts/make-icons.py",
+    "test": "node scripts/selftest.mjs"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

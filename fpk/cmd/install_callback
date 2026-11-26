@@ -1,0 +1,32 @@
+#!/bin/bash
+# 安装后初始化：创建数据目录，按向导写入访问密码。
+
+set -u
+
+export PATH=/var/apps/nodejs_v22/target/bin:$PATH
+
+APP_DIR="${TRIM_APPDEST:-/var/apps/shuaishuai.nas/target}"
+DATA_DIR="${TRIM_PKGVAR:-/var/apps/shuaishuai.nas/var}"
+ETC_DIR="${TRIM_PKGETC:-/var/apps/shuaishuai.nas/etc}"
+LOGFILE="${TRIM_TEMP_LOGFILE:-/dev/null}"
+
+mkdir -p "${DATA_DIR}" "${ETC_DIR}" 2>/dev/null
+chmod 755 "${DATA_DIR}" 2>/dev/null
+
+if [ -n "${wizard_password:-}" ]; then
+  if ! node "${APP_DIR}/server/lib/set-password.js" "${ETC_DIR}/auth.env" "${wizard_password}" 2>>"${DATA_DIR}/app.log"; then
+    echo "写入访问密码失败，请检查应用目录权限。" > "${LOGFILE}"
+    exit 1
+  fi
+  chmod 600 "${ETC_DIR}/auth.env" 2>/dev/null
+fi
+
+# 把授权目录持久化：应用重启时不一定还能拿到 TRIM_DATA_ACCESSIBLE_PATHS
+if [ "${TRIM_DATA_ACCESSIBLE_PATHS+x}" = "x" ]; then
+  node "${APP_DIR}/server/lib/write-env.js" "${ETC_DIR}/paths.env" SS_ROOTS "${TRIM_DATA_ACCESSIBLE_PATHS}" 2>>"${DATA_DIR}/app.log" || true
+fi
+
+: > "${DATA_DIR}/app.log" 2>/dev/null
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] installed v${TRIM_APPVER:-unknown}" >> "${DATA_DIR}/app.log"
+
+exit 0

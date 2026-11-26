@@ -1,0 +1,32 @@
+[
+  {
+    "stepTitle": "访问控制",
+    "items": [
+      {
+        "type": "password",
+        "field": "wizard_password",
+        "label": "新的访问密码",
+        "helpText": "留空表示保持现有密码不变。"
+      },
+      {
+        "type": "switch",
+        "field": "wizard_disable_auth",
+        "label": "关闭访问密码（仅限完全可信的内网）",
+        "initValue": "false"
+      },
+      {
+        "type": "tips",
+        "helpText": "保存后应用会自动重启。若关闭密码，任何能访问该端口的人都可以打开工具箱。"
+      }
+    ]
+  },
+  {
+    "stepTitle": "目录授权",
+    "items": [
+      {
+        "type": "tips",
+        "helpText": "授权目录在「应用设置 → 授权目录」中管理，本向导不会修改它。<br>变更授权后应用会自动重启并重新读取路径。"
+      }
+    ]
+  }
+]

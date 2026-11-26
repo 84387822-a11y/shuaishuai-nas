@@ -1,0 +1,6 @@
+#!/bin/bash
+# 配置变更前：不做任何事。
+# 授权目录与密码都由应用热加载（paths.env / auth.env 监听），无需停服务。
+
+set -u
+exit 0

@@ -1,0 +1,20 @@
+#!/bin/bash
+# 安装前检查：确认 fnOS 运行时与基础目录可用。
+
+set -u
+
+export PATH=/var/apps/nodejs_v22/target/bin:$PATH
+LOGFILE="${TRIM_TEMP_LOGFILE:-/dev/null}"
+
+if ! command -v node > /dev/null 2>&1; then
+  echo "未找到 Node.js 运行时（nodejs_v22）。请确认系统版本 ≥ 1.1.8 后重试。" > "${LOGFILE}"
+  exit 1
+fi
+
+NODE_MAJOR=$(node -p "process.versions.node.split('.')[0]" 2>/dev/null || echo 0)
+if [ "${NODE_MAJOR}" -lt 18 ]; then
+  echo "Node.js 版本过低（当前 ${NODE_MAJOR}），需要 18 及以上。" > "${LOGFILE}"
+  exit 1
+fi
+
+exit 0

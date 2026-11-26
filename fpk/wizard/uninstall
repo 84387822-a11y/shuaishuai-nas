@@ -1,0 +1,25 @@
+[
+  {
+    "stepTitle": "确认卸载",
+    "items": [
+      {
+        "type": "tips",
+        "helpText": "卸载会移除应用本体，但默认保留运行数据（撤销记录、日志等）。"
+      },
+      {
+        "type": "radio",
+        "field": "wizard_delete_data",
+        "label": "数据处理方式",
+        "initValue": "keep",
+        "options": [
+          { "label": "保留数据（推荐，重新安装后可继续使用）", "value": "keep" },
+          { "label": "删除所有应用数据（不可恢复）", "value": "delete" }
+        ]
+      },
+      {
+        "type": "tips",
+        "helpText": "你的媒体文件不受影响：本应用从不修改未授权的目录。"
+      }
+    ]
+  }
+]

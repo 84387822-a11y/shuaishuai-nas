@@ -1,0 +1,13 @@
+#!/bin/bash
+# 升级后：补齐目录、修正脚本权限，不覆盖用户配置。
+
+set -u
+
+DATA_DIR="${TRIM_PKGVAR:-/var/apps/shuaishuai.nas/var}"
+ETC_DIR="${TRIM_PKGETC:-/var/apps/shuaishuai.nas/etc}"
+
+mkdir -p "${DATA_DIR}" "${ETC_DIR}" 2>/dev/null
+chmod 755 "${DATA_DIR}" 2>/dev/null
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] upgraded from ${TRIM_OLD_APPVER:-?} to ${TRIM_APPVER:-?}" >> "${DATA_DIR}/app.log" 2>/dev/null
+
+exit 0

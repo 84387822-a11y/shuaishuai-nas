@@ -1,0 +1,8 @@
+node_modules/
+dist/*.fpk
+dist/*.tar.gz
+dist/stage/
+.DS_Store
+*.log
+var/
+.env

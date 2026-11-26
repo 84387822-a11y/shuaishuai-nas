@@ -1,0 +1,7 @@
+#!/bin/bash
+# 升级前：停止服务，保留 var / etc 中的用户数据。
+
+set -u
+
+"${TRIM_APPDEST:-/var/apps/shuaishuai.nas/target}/../cmd/main" stop 2>/dev/null || true
+exit 0
