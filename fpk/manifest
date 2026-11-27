@@ -1,5 +1,5 @@
 appname         = shuaishuai.nas
-version         = 1.0.1
+version         = 1.0.2
 display_name    = NAS助手
 desc            = 面向飞牛 fnOS 玩家的一体化本地 Web 工具箱：应用中心一键部署、影视文件规范化、网络工具、监控仪表盘、硬盘 SMART 与常用小工具。<br>只做配置辅助与模板生成，不内置、不下载、不分发任何资源与音源。<br>所有文件操作仅限你在「应用设置 → 授权目录」中明确授权的目录。
 source          = thirdparty
@@ -13,5 +13,5 @@ service_port    = 8620
 checkport       = true
 ctl_stop        = true
 install_dep_apps = nodejs_v22
-changelog       = v1.0.1：天气模块：Open-Meteo 预报接口在国内网络常不可达，新增 wttr.in 自动回退与 SS_WEATHER_PROVIDER 开关
+changelog       = v1.0.2：应用中心卡片内部对齐修复；镜像拉取优化——按 Docker Hub / ghcr.io 分别匹配国内加速源、缩短逐源超时、失败时展示各源耗时与原因
 checksum        =

@@ -225,10 +225,10 @@ function openDeploy(app) {
       // 通知页面刷新列表 —— 弹窗作用域不直接调用页面的 loadCatalog，避免作用域问题
       window.dispatchEvent(new CustomEvent('apps:refresh'));
     } catch (err) {
-      // 把后端 docker compose 的真实报错（err.detail）也显示出来，而不是只留一句「部署失败」
+      // 把后端真实报错（err.detail）也显示出来（可能是镜像拉取记录，或 docker compose 输出），而不是只留一句「部署失败」
       statusBox.replaceChildren(
         note('部署失败：' + err.message, 'error'),
-        err.detail ? codeBlock(err.detail, { title: 'docker compose 输出', lang: 'text' }) : null
+        err.detail ? codeBlock(err.detail, { title: '详细输出', lang: 'text' }) : null
       );
     } finally {
       deployBtn.disabled = false;
