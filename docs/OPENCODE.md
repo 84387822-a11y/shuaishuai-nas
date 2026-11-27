@@ -37,6 +37,8 @@ node scripts/build-fpk.mjs --platform both   # x86 + arm 一起打包
   - 方式 2：在现有目录里 `git init`，然后 `git remote add origin https://github.com/84387822-a11y/shuaishuai-nas.git`，`git fetch && git rebase origin/main`。
 - 每次改完：`git add`（只加你负责的文件）→ `git commit` → `git push`。
 - **遵守 `docs/TASKS.md` 分工**：不要和另一位 AI 同时改同一个文件；不要手改 `dist/`。
+- **改代码/功能后必须升版本 + 重新打包两个架构**（`npm run release -- --bump patch --changelog ...`），不要“只改代码不打安装包”。
+- **推送到 GitHub / 创建 Release 前，先问用户**，确认后才做。
 - 安装包 `.fpk` 不进仓库，作为 **GitHub Release 附件**发布。
 
 ## 5. 发版（一次只让一个 AI 做）

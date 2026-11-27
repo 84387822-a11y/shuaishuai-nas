@@ -147,6 +147,10 @@ function buildAppTgz(appDir) {
       fs.copyFileSync(path.join(ROOT, extra), path.join(appDir, extra));
     }
   }
+  // 内置数据（应用商店种子目录等），避免首次打开时等外网
+  if (fs.existsSync(path.join(ROOT, 'data'))) {
+    copyDir(path.join(ROOT, 'data'), path.join(appDir, 'data'));
+  }
   // 关键：入口配置必须在应用目录内（解压后为 target/ui/config）。
   // 官方文档：入口配置写在 app/ui/config；desktop_uidir 相对于应用目录解析。
   copyDir(path.join(FPK_DIR, 'ui'), path.join(appDir, 'ui'));

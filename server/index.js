@@ -22,6 +22,16 @@ const routes = require('./routes');
 const PKG = require('../package.json');
 const PORT = Number(process.env.SS_PORT || 8620);
 const HOST = process.env.SS_HOST || '0.0.0.0';
+// 桌面网关模式（fnOS `type:iframe` + `gatewaySocket`）：
+// SS_SOCKETS 是多个 unix socket 路径（冒号分隔）——fnOS 网关到底在哪找 socket 不定，
+// 所以在候选位置都建一个，兜底保证命中。SS_SOCKET 是单个的兼容写法。
+// SS_BASE 是网关前缀，请求会带此前缀进来，先剥掉再路由。
+const SOCKET = process.env.SS_SOCKET || '';
+const SOCKET_LIST = String(process.env.SS_SOCKETS || SOCKET).split(':').map((s) => s.trim()).filter(Boolean);
+const BASE_PREFIX = String(process.env.SS_BASE || '').replace(/[\/]+$/g, '').trim();
+// 桌面网关前缀：fnOS 按应用的 appname 路由（如 /app/shuaishuai.nas）。
+// 兼容 SS_BASE 与 /app/<appname> 及旧写法的 /app/shuaishuai，命中哪个就剥哪个。
+const GATEWAY_PREFIXES = [...new Set(['/app/shuaishuai.nas', '/app/shuaishuai', BASE_PREFIX].filter(Boolean))];
 const WEB_DIR = path.join(__dirname, '..', 'web');
 const MAX_BODY = 4 * 1024 * 1024;
 
@@ -63,6 +73,15 @@ function sendText(res, status, text, type = 'text/plain; charset=utf-8') {
     'X-Content-Type-Options': 'nosniff',
   });
   res.end(text);
+}
+
+/** 网关基址的 HTML 注入：让前端能用相对路径，也能在 JS 里读到 app-base。 */
+function htmlWithBase(html) {
+  // BASE 为空（TCP/Docker 直连）用 '/'；有前缀则用它（带结尾斜杠，保证相对解析正确）
+  const base = BASE_PREFIX ? `${BASE_PREFIX}/` : '/';
+  if (/<base /i.test(html) || /name=["']app-base/.test(html)) return html;
+  const tag = `\n  <base href="${base}">\n  <meta name="app-base" content="${base}">`;
+  return html.replace(/<head>/i, (m) => m + tag);
 }
 
 function sendDownload(res, { filename, content, mime = 'text/plain; charset=utf-8' }) {
@@ -132,11 +151,11 @@ function serveStatic(req, res, pathname) {
     return sendText(res, 403, '403 Forbidden');
   }
   if (pathname === '/' && !auth.isAuthed(req)) {
-    res.writeHead(302, { Location: '/login' });
+    res.writeHead(302, { Location: `${BASE_PREFIX}/login` });
     return res.end();
   }
   if (pathname === '/login' && auth.isAuthed(req)) {
-    res.writeHead(302, { Location: '/' });
+    res.writeHead(302, { Location: `${BASE_PREFIX}/` });
     return res.end();
   }
 
@@ -149,6 +168,21 @@ function serveStatic(req, res, pathname) {
       return sendText(res, 404, '404 Not Found');
     }
     const ext = path.extname(full).toLowerCase();
+
+    // HTML 注入网关基址：让前端相对路径在网关前缀下也能正确解析
+    if (ext === '.html') {
+      const body = Buffer.from(htmlWithBase(fs.readFileSync(full, 'utf8')), 'utf8');
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Length': body.length,
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+        'Referrer-Policy': 'same-origin',
+      });
+      if (req.method === 'HEAD') return res.end();
+      return res.end(body);
+    }
+
     res.writeHead(200, {
       'Content-Type': MIME[ext] || 'application/octet-stream',
       'Content-Length': st.size,
@@ -233,7 +267,7 @@ async function handleApi(req, res, pathname, query) {
 /* 服务启动                                                            */
 /* ------------------------------------------------------------------ */
 
-const server = http.createServer((req, res) => {
+function handleRequest(req, res) {
   const started = Date.now();
   let url;
   try {
@@ -260,6 +294,12 @@ const server = http.createServer((req, res) => {
     return sendText(res, 400, '400 Bad Request');
   }
 
+  // 桌面网关：请求带网关前缀（如 /app/shuaishuai.nas/...），先剥掉，后续按无前缀路由
+  for (const pre of GATEWAY_PREFIXES) {
+    if (pathname === pre) { pathname = '/'; break; }
+    if (pathname.startsWith(`${pre}/`)) { pathname = pathname.slice(pre.length); break; }
+  }
+
   if (pathname.startsWith('/api/')) {
     handleApi(req, res, pathname, url.searchParams).catch((err) => {
       if (res.writableEnded) return;
@@ -278,7 +318,10 @@ const server = http.createServer((req, res) => {
     return sendText(res, 405, '405 Method Not Allowed');
   }
   serveStatic(req, res, pathname);
-});
+}
+
+const server = http.createServer(handleRequest);
+let tcpServer = null; // 桌面网关模式下 127.0.0.1:PORT 的兜底监听
 
 server.on('clientError', (err, socket) => {
   if (socket.writable) socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
@@ -293,13 +336,16 @@ server.on('error', (err) => {
   process.exit(1);
 });
 
-server.listen(PORT, HOST, () => {
+function onListen() {
   const roots = allowedRoots();
+  const listeners = SOCKET_LIST.length
+    ? `unix sockets: ${SOCKET_LIST.join(', ')}（桌面网关）`
+    : `http://${HOST === '0.0.0.0' ? '127.0.0.1' : HOST}:${PORT}`;
   const lines = [
     '',
     '  NAS助手  v' + PKG.version,
     '  ------------------------------------------',
-    `  监听地址 : http://${HOST === '0.0.0.0' ? '127.0.0.1' : HOST}:${PORT}`,
+    `  监听 : ${listeners}${BASE_PREFIX ? `  网关前缀 ${BASE_PREFIX}` : ''}`,
     `  授权目录 : ${roots.join('  ') || '（无）'}`,
     `  数据目录 : ${DATA_DIR}`,
     `  访问密码 : ${auth.enabled() ? '已开启' : '未设置（仅建议在内网使用）'}`,
@@ -307,13 +353,48 @@ server.listen(PORT, HOST, () => {
     '',
   ];
   console.log(lines.join('\n'));
-  logger.write(`启动 v${PKG.version} · platform=${process.platform} · port=${PORT} · roots=${ROOTS.length}`);
+  logger.write(`启动 v${PKG.version} · platform=${process.platform} · port=${SOCKET_LIST.length ? SOCKET_LIST.join('|') : PORT} · roots=${ROOTS.length}`);
   if (ROOTS.length === 0) console.warn('[警告] 没有可用的授权目录，文件类功能会全部被拒绝。');
-});
+}
+
+const socketServers = [];
+
+if (SOCKET_LIST.length) {
+  // 桌面网关模式：在多个候选位置各建一个 unix socket（fnOS 网关到底在哪找不定，全建兜底），
+  // 再监听 127.0.0.1:PORT 作 TCP 兜底（与牛管家一致）。
+  for (const p of SOCKET_LIST) {
+    try { fs.unlinkSync(p); } catch { /* 不存在则忽略 */ }
+    try { fs.mkdirSync(path.dirname(p), { recursive: true }); } catch { /* 已存在则忽略 */ }
+    const s = http.createServer(handleRequest);
+    s.on('error', (err) => {
+      console.error('[socket ' + p + '] 监听失败（未命中，其它 socket / TCP 仍可用）：' + err.message);
+    });
+    try {
+      s.listen(p, onListen);
+      socketServers.push(s);
+    } catch (err) {
+      console.error('[socket ' + p + '] 监听异常：' + err.message);
+    }
+  }
+
+  tcpServer = http.createServer(handleRequest);
+  tcpServer.on('error', (err) => {
+    console.error('[tcp fallback] 127.0.0.1:' + PORT + ' 监听失败（仅兜底）：' + err.message);
+  });
+  try {
+    tcpServer.listen(PORT, '127.0.0.1');
+  } catch (err) {
+    console.error('[tcp fallback] 监听异常：' + err.message);
+  }
+} else {
+  server.listen(PORT, HOST, onListen);
+}
 
 function shutdown(signal) {
   console.log(`\n收到 ${signal}，正在停止服务...`);
   server.close(() => process.exit(0));
+  for (const s of socketServers) { try { s.close(); } catch { /* ignore */ } }
+  if (tcpServer) { try { tcpServer.close(); } catch { /* ignore */ } }
   setTimeout(() => process.exit(0), 3000).unref();
 }
 process.on('SIGINT', () => shutdown('SIGINT'));

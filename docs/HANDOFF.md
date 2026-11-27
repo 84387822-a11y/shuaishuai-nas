@@ -42,11 +42,11 @@ shuaishuai-nas/
 │       ├── system.js       # /api/system、/api/roots（列表/新增/移除）、/api/settings
 │       ├── monitor.js      # 监控 + 天气（/api/monitor/weather）
 │       ├── network.js      # Ping / TCP / DNS / HTTP / 子网
-│       ├── apps.js / rename.js / smart.js / tools.js / wallpaper.js / music.js / logs.js
+│       ├── apps.js / rename.js / smart.js / tools.js / music.js / logs.js
 ├── web/
 │   ├── index.html / login.html / styles.css / app.js / ui.js
 │   └── modules/            # 每个页面一个模块，导出 render(root, ctx)
-│       ├── apps.js rename.js network.js monitor.js smart.js wallpaper.js tools.js
+│       ├── apps.js rename.js network.js monitor.js smart.js tools.js
 │       ├── settings.js     # 「设置」页（授权目录/访问模式）—— 本轮新增
 │       └── about.js        # 关于/免责声明/日志/访问模式
 ├── fpk/                    # fnOS 应用包源
@@ -100,6 +100,17 @@ shuaishuai-nas/
 6. **发布到 GitHub**
    - 创建公开仓库并推送 74 个源文件；发布 `v1.0.0`，后发布 `v1.0.1`。
    - 安装包作为 **Release 附件**上传（不放进仓库，`.gitignore` 已排除 `dist/*.fpk`）。
+
+6b. **桌面网关改造（v1.0.3，仿牛管家 CowButler）**
+   - 目标：fnOS 桌面点开在系统窗口内嵌、不暴露 8620 端口。
+   - `server/index.js`：支持 `SS_SOCKET`（unix socket）+ `SS_BASE`（网关前缀剥离，`/app/shuaishuai`）+ HTML 注入 `<base>`/`app-base` meta；保留 `SS_PORT` 作 Docker/直连后备。
+   - `web/index.html`、`web/login.html`、`web/ui.js`：改为相对路径 / `resolveApp()` 基址解析。
+   - `fpk/ui/config`：`type:iframe` + `gatewayPrefix:/app/shuaishuai` + `gatewaySocket:app.sock`。
+   - `fpk/cmd/main`：网关模式绑 `${DATA_DIR}/app.sock`（`SS_SOCKET` 可覆盖），stop 清理 socket。
+   - `fpk/manifest`：`os_min_version=1.2.1102`、`checkport=false`（保留 `service_port=8620` 以满足校验）。
+   - `scripts/verify-fpk.mjs`：支持 `url+port` 与 `iframe+gatewaySocket` 两种入口校验。
+   - 已验证：网关前缀模拟全通、check 48/48、e2e 20/20、x86+arm 打包校验通过。
+   - **待真机确认**：fnOS 网关期望的 socket 路径（默认假设在 `${DATA_DIR}`）；若不对需按 fnOS 日志调整。
 
 7. **发布封面**
    - `docs/cover.png`（1280×640，GitHub 社交预览）与 `docs/cover-vertical.png`（1080×1920 竖版）。

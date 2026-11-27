@@ -4,10 +4,14 @@
 
 set -u
 
-APP_DIR="${TRIM_APPDEST:-/var/apps/shuaishuai.nas/target}"
-DATA_DIR="${TRIM_PKGVAR:-/var/apps/shuaishuai.nas/var}"
-ETC_DIR="${TRIM_PKGETC:-/var/apps/shuaishuai.nas/etc}"
+APP_DIR="${TRIM_APPDEST:-/var/apps/shuaishuai/target}"
+DATA_DIR="${TRIM_PKGVAR:-/var/apps/shuaishuai/var}"
+ETC_DIR="${TRIM_PKGETC:-/var/apps/shuaishuai/etc}"
 PORT="${TRIM_SERVICE_PORT:-8620}"
+# 桌面网关模式：HTTP 服务绑到 unix socket（app.sock），由 fnOS 桌面网关代理，不再开放 TCP 端口。
+# fnOS 网关到底在哪个位置建/找 app.sock 不定，所以在 APPDEST 与 VAR（数据目录）两个候选位都建 socket，
+# 服务端全绑定兜底；SS_SOCKETS 可覆盖（冒号分隔）。同时监听 127.0.0.1:PORT 作 TCP 兜底。
+SOCKET_PATHS="${SS_SOCKETS:-${APP_DIR}/app.sock:${DATA_DIR}/app.sock}"
 # 只使用用户在「应用设置 → 可访问的文件」里授权的路径；
 # 未授权时为空（不是回退到常见目录），避免越权扫描
 ROOTS="${TRIM_DATA_ACCESSIBLE_PATHS:-}"
@@ -99,7 +103,7 @@ start_app() {
     fi
   fi
 
-  log "starting with ${NODE_BIN} on port ${PORT}"
+  log "starting with ${NODE_BIN} on sockets: ${SOCKET_PATHS} (desktop gateway)"
   log "authorized roots: ${ROOTS}"
 
   cd "${APP_DIR}" || {
@@ -107,8 +111,22 @@ start_app() {
     return 1
   }
 
-  SS_PORT="${PORT}" \
-  SS_HOST="0.0.0.0" \
+  # 诊断：把 fnOS 给应用的 TRIM_* / socket / 路由相关环境变量写进日志，方便一次性定位真实 socket 目录
+  {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] --- fnOS env (诊断) ---"
+    env | grep -iE 'trim|socket|unix|gateway|coods|app(des|name|dir|id|ver)|pkg(var|etc|dest)|route' | sort
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] --- fnOS env end ---"
+  } >> "${LOG_FILE}" 2>/dev/null || true
+
+  # 桌面临网：为每个候选 socket 确保父目录存在并清掉残留 socket 文件（避免 EADDRINUSE）
+  IFS=':' read -r -a _socks <<< "${SOCKET_PATHS}"
+  for s in "${_socks[@]}"; do
+    mkdir -p "$(dirname "${s}")" 2>/dev/null
+    rm -f "${s}" 2>/dev/null
+  done
+
+  SS_SOCKETS="${SOCKET_PATHS}" \
+  SS_BASE="/app/shuaishuai" \
   SS_DATA_DIR="${DATA_DIR}" \
   SS_ROOTS="${ROOTS}" \
   SS_PASSWORD="${SS_PASSWORD:-}" \
@@ -160,6 +178,10 @@ stop_app() {
   fi
 
   rm -f "${PID_FILE}"
+  IFS=':' read -r -a _socks <<< "${SOCKET_PATHS}"
+  for s in "${_socks[@]}"; do
+    rm -f "${s}" 2>/dev/null
+  done
   log "stopped"
   return 0
 }

@@ -353,12 +353,15 @@ function run(cmd, args = [], opts = {}) {
       resolve(value);
     };
 
+    // Windows 下 .cmd/.bat 必须经由 shell 才能被 execFile 执行（自动化测试用的假命令）
+    const useShell = IS_WIN && /\.(cmd|bat)$/i.test(String(cmd));
+
     let child;
     try {
       child = execFile(
         cmd,
         args,
-        { timeout, maxBuffer, encoding: 'buffer', windowsHide: true, killSignal: 'SIGKILL' },
+        { timeout, maxBuffer, encoding: 'buffer', windowsHide: true, killSignal: 'SIGKILL', shell: useShell },
         (err, stdout, stderr) => {
           done({
             code: err ? (typeof err.code === 'number' ? err.code : -1) : 0,

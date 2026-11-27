@@ -193,26 +193,103 @@ async function main() {
     return 'compose 正常';
   });
 
-  await check('POST /api/apps/compose (songloft)', async () => {
-    const r = await call(base, 'POST', '/api/apps/compose', {
-      id: 'songloft',
-      mediaDir: fixture,
-      extraEnv: { ADMIN_USERNAME: 'admin', ADMIN_PASSWORD: 'test-pass-123' },
-    });
+  await check('GET /api/checkup/scan（一键体检）', async () => {
+    const r = await call(base, 'GET', '/api/checkup/scan');
     assert(r.payload.ok, r.payload.error || '失败');
-    assert(r.payload.data.compose.includes('songloft/songloft'), '镜像缺失');
-    assert(r.payload.data.compose.includes('ADMIN_PASSWORD'), '密码参数缺失');
-    assert(r.payload.data.compose.includes('/app/music'), '音乐目录缺失');
-    return 'Songloft compose 正常';
+    const d = r.payload.data;
+    assert(Array.isArray(d.items) && d.items.length >= 3, '体检项不足');
+    assert(typeof d.summary.total === 'number', '缺少汇总');
+    return `${d.items.length} 项 / 异常 ${d.summary.bad}`;
   });
 
-  await check('POST /api/apps/compose (tailscale)', async () => {
-    const r = await call(base, 'POST', '/api/apps/compose', { id: 'tailscale' });
+  await check('GET /api/cleanup/scan（系统清理，只扫描）', async () => {
+    const r = await call(base, 'GET', '/api/cleanup/scan');
     assert(r.payload.ok, r.payload.error || '失败');
-    assert(r.payload.data.compose.includes('network_mode: host'), '缺少 host 网络');
-    assert(r.payload.data.compose.includes('NET_ADMIN'), '缺少 NET_ADMIN');
-    assert(r.payload.data.compose.includes('/dev/net/tun'), '缺少 TUN 设备');
-    return 'Tailscale compose 正常';
+    assert(Array.isArray(r.payload.data.targets), 'targets 应为数组');
+    return `${r.payload.data.targets.length} 个可清理项`;
+  });
+
+  await check('GET /api/procs（服务进程）', async () => {
+    const r = await call(base, 'GET', '/api/procs');
+    assert(r.payload.ok, r.payload.error || '失败');
+    assert(Array.isArray(r.payload.data.items), '进程列表应为数组');
+    return `${r.payload.data.items.length} 个进程 / 端口 ${r.payload.data.ports.length}`;
+  });
+
+  await check('GET /api/docker/overview（Docker 概览）', async () => {
+    const r = await call(base, 'GET', '/api/docker/overview');
+    assert(r.payload.ok, r.payload.error || '失败');
+    assert(typeof r.payload.data.available === 'boolean', '缺少 available 标记');
+    return r.payload.data.available ? `${r.payload.data.containers.length} 个容器` : '本机 Docker 不可用（已降级）';
+  });
+
+  await check('GET /api/hardware/overview（硬件信息）', async () => {
+    const r = await call(base, 'GET', '/api/hardware/overview');
+    assert(r.payload.ok, r.payload.error || '失败');
+    const d = r.payload.data;
+    assert(d.cpu && typeof d.cpu.cores === 'number', '缺少 CPU 信息');
+    assert(Array.isArray(d.nics), '网卡列表应为数组');
+    assert(d.memory && typeof d.memory.total === 'number', '缺少内存信息');
+    return `${d.cpu.cores} 核 / 内存 ${(d.memory.total / 1024 ** 3).toFixed(0)}GB / 网卡 ${d.nics.length}`;
+  });
+
+  await check('GET /api/storage/overview（硬盘存储）', async () => {
+    const r = await call(base, 'GET', '/api/storage/overview');
+    assert(r.payload.ok, r.payload.error || '失败');
+    const d = r.payload.data;
+    assert(Array.isArray(d.disks), '磁盘列表应为数组');
+    assert(Array.isArray(d.partitions), '分区列表应为数组');
+    assert(d.summary && typeof d.summary.diskCount === 'number', '缺少汇总');
+    return `${d.disks.length} 块盘 / ${d.partitions.length} 个分区`;
+  });
+
+  await check('GET /api/update/check（版本检测）', async () => {
+    const r = await call(base, 'GET', '/api/update/check');
+    assert(r.payload.ok, r.payload.error || '失败');
+    const d = r.payload.data;
+    assert(typeof d.current === 'string' && d.current, '缺少当前版本');
+    assert(typeof d.releases_url === 'string' && d.releases_url.includes('releases'), '缺少 Releases 链接');
+    return `当前 v${d.current} / ${d.latest ? '最新 v' + d.latest : (d.error || '未取到最新')}`;
+  });
+
+  await check('GET /api/filemgr/list + analyze（文件管理）', async () => {
+    const list = await call(base, 'GET', '/api/filemgr/list');
+    assert(list.payload.ok, list.payload.error || '失败');
+    assert(Array.isArray(list.payload.data.entries), '目录列表应为数组');
+    const a = await call(base, 'GET', '/api/filemgr/analyze');
+    assert(a.payload.ok, a.payload.error || '失败');
+    assert(Array.isArray(a.payload.data.categories), '分类应为数组');
+    assert(Array.isArray(a.payload.data.largest), '大文件应为数组');
+    return `${list.payload.data.entries.length} 个条目 / ${a.payload.data.files} 个文件`;
+  });
+
+  await check('GET /api/security/overview（安全防护）', async () => {
+    const r = await call(base, 'GET', '/api/security/overview');
+    assert(r.payload.ok, r.payload.error || '失败');
+    const d = r.payload.data;
+    assert(Array.isArray(d.items) && d.items.length >= 3, '检查项不足');
+    assert(d.score === null || typeof d.score === 'number', 'score 类型异常');
+    assert(typeof d.level === 'string', '缺少等级');
+    return `${d.items.length} 项 / ${d.score === null ? '无法评分' : d.score + ' 分'}`;
+  });
+
+  await check('GET /api/speedtest/ping（延迟/抖动/丢包）', async () => {
+    const r = await call(base, 'GET', '/api/speedtest/ping?count=5');
+    assert(r.payload.ok, r.payload.error || '失败');
+    const d = r.payload.data;
+    assert(typeof d.loss === 'number', '缺少丢包率');
+    assert(Array.isArray(d.samples), '缺少采样');
+    return `延迟 ${d.latency ?? '—'}ms / 丢包 ${d.loss}%`;
+  });
+
+  await check('GET /api/netdiag/lan + /traffic（网络诊断）', async () => {
+    const lan = await call(base, 'GET', '/api/netdiag/lan');
+    assert(lan.payload.ok, lan.payload.error || '失败');
+    assert(Array.isArray(lan.payload.data.items), '邻居列表应为数组');
+    const t = await call(base, 'GET', '/api/netdiag/traffic');
+    assert(t.payload.ok, t.payload.error || '失败');
+    assert(Array.isArray(t.payload.data.items), '流量列表应为数组');
+    return `邻居 ${lan.payload.data.items.length} / 接口 ${t.payload.data.items.length}`;
   });
 
   await check('POST /api/apps/suggest-port', async () => {

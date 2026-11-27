@@ -27,8 +27,12 @@
    npm test        # 端到端冒烟测试，必须全过
    ```
    （两个工具都装好 Node.js ≥ 18，不要装 npm 依赖。）
-4. 如果改了功能 / 界面：`node scripts/build-fpk.mjs --platform both` 重新打包并做一次真机/临时实例验证。
-5. `git add` 只提交你认领的文件 → `git commit` → `git push`。
+4. **硬规则**：每次改代码 / 功能，都必须**同步升级版本号并重新生成两个架构（x86+arm）安装包**：
+   ```bash
+   npm run release -- --bump patch --changelog "本次改动说明"
+   ```
+5. 产物 `dist/shuaishuai.nas_<版本>_<arch>.fpk` 交给用户本地测试。
+6. `git add` 只提交你认领的文件 → `git commit`；**推送到 GitHub 前先问用户**，确认后才 `git push` / 创建 Release。
 
 ## 3. 分支约定（可选，更安全）
 

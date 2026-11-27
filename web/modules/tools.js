@@ -3,6 +3,8 @@
  * 所有请求都由后端在本机完成，前端不引入任何第三方库。
  */
 
+import { render as renderRename } from './rename.js';
+
 import {
   action, api, badge, button, bytes, card, checkbox, codeBlock, copyText, el,
   field, hint, input, kv, list, note, segmented, select, split, stats, table, tabs, textarea, toast,
@@ -914,25 +916,7 @@ function expressTab() {
     toast('手机号“查全部快递”必须本人 OTP 归属核验（隐私授权），免费 API 不提供，工具无法自动聚合。请去官方，或把该号码名下的单号绑定到「我的快递」自动刷新。', 'info');
   }));
 
-  const bindsCard = card('我的快递（打开自动刷新）',
-    '把你和家人的单号绑进来，以后打开本页自动更新状态与轨迹',
-    el('div', { class: 'row', style: { marginBottom: '12px', gap: '8px' } },
-      el('div', { style: { flex: '1 1 200px', minWidth: 0 } }, field('单号', bindNumInput)),
-      el('div', { style: { flex: '0 0 150px' } }, field('快递', bindComSelect)),
-      el('div', { style: { flex: '1 1 150px', minWidth: 0 } }, field('备注', bindLabelInput, '谁的，如：老婆的'))),
-    el('div', { class: 'form-actions' },
-      (refreshAllBtn = button('刷新全部', () => action(refreshAllBtn, () => refreshAll()))),
-      el('span', { class: 'muted small', text: `已绑定 ${binds.length} 个单号` })),
-    bindListHost,
-    hint('打开本页会自动刷新全部绑定单号；每条可单独刷新 / 一键打开官方查单页 / 删除。')
-  );
-
-  const phoneCard = card('手机号查快递', '为什么不能「输手机号就看全部」',
-    note('「手机号查所有快递」需手机号本人收验证码通过归属核验（隐私授权），免费 / 公开 API 不提供，本工具不能代替。这是快递业的隐私规则，绕不过。', 'warn'),
-    note('你自己的号码：到「快递100 微信小程序 / APP → 手机号查快递」用验证码验一下，官方会列出该号码名下的包裹。', 'info'),
-    el('div', { class: 'row', style: { marginBottom: '12px' } }, phoneInput, el('div', {}, phoneBtn)),
-    hint('想自动看全家快递？把家里每个人的单号「绑定」到上面的「我的快递」，打开即自动刷新（备注里写是谁的）。')
-  );
+  // 已移除「我的快递」「手机号查快递」两张卡片，仅保留下方「查快递（临时输入单号）」。
 
   const tempCard = card('查快递（临时输入单号）', '不绑定也能查一次',
     field('快递单号', numInput, '支持顺丰 / 圆通 / 中通 / 申通 / 韵达 / 极兔 / 京东 / EMS / 邮政等'),
@@ -943,11 +927,7 @@ function expressTab() {
     hint('轨迹由快递100 提供；「打开官方查单页」按钮始终可用，不看 Key。')
   );
 
-  const left = stack(bindsCard, phoneCard, tempCard);
-
-  // 打开本页即自动刷新全部绑定单号
-  paintBinds();
-  refreshAll().catch(() => {});
+  const left = stack(tempCard);
 
   return split(left, out);
 }
@@ -958,6 +938,14 @@ export async function render(root) {
   root.appendChild(note('所有计算都在本机完成，不会上传任何内容。', 'info'));
   root.appendChild(
     tabs([
+      {
+        label: '文件规范化',
+        render: () => {
+          const box = el('div', { style: { display: 'grid', gap: '16px' } });
+          renderRename(box).catch((err) => box.appendChild(note('加载失败：' + (err.message || err), 'error')));
+          return box;
+        },
+      },
       { label: '编码转换', render: encodingTab },
       { label: '哈希', render: hashTab },
       { label: 'JSON', render: jsonTab },

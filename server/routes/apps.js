@@ -22,27 +22,15 @@ const APPS_DIR = path.join(DATA_DIR, 'apps');
 const CACHE_FILE = path.join(DATA_DIR, 'releases-cache.json');
 const CACHE_TTL = 6 * 60 * 60 * 1000;
 
-// 拉不到官方源时按顺序尝试的镜像加速源。
-// 按「镜像所在 registry」分别配置：Docker Hub 用一套，ghcr.io 用另一套。
-// 前置项更快、后面是兜底；`registryOf()` 根据 image 判断走哪套。
-const MIRRORS = {
-  'docker.io': [
-    'docker.m.daocloud.io',
-    'docker.1ms.run',
-    'dockerproxy.net',
-    'hub.rat.dev',
-    'docker.m.daocloud.net',
-  ],
-  'ghcr.io': [
-    'ghcr.nju.edu.cn',
-    'ghcr.dockerproxy.net',
-    'ghcr.1ms.run',
-  ],
-};
-
-// 单个源拉取的超时：太短会把「慢但能通」的大镜像误杀，太长会让失败时干等。
-// 20s 是「尽快失败 + 大镜像可完成」之间的折中。
-const PULL_TIMEOUT = 20000;
+// 拉不到 Docker Hub 时按顺序尝试的镜像加速源（前面快、后面兜底）
+const MIRRORS = [
+  'docker.m.daocloud.io',
+  'docker.1ms.run',
+  'dockerproxy.net',
+  'hub.rat.dev',
+  'docker.m.daocloud.net',
+];
+const PULL_TIMEOUT = 45000;
 
 /* ------------------------------------------------------------------ */
 /* 应用目录                                                            */
@@ -383,20 +371,6 @@ const CATALOG = [
     },
   },
   {
-    id: 'mediary-scout',
-    name: '巡影 Mediary Scout',
-    category: 'FPK 应用',
-    icon: '🎬',
-    color: '#7c3aed',
-    desc: '开源 AI 影视自动追更与多网盘（夸克/UC/115/123 等）媒体库整理工具（注意：发布的是桌面 .dmg/.exe，不是 fnOS 的 .fpk）',
-    githubUrl: 'https://github.com/fancydirty/mediary-scout',
-    pkg: '桌面安装包（.dmg/.exe）',
-    link: {
-      url: 'https://github.com/fancydirty/mediary-scout/releases',
-      text: '前往 GitHub 下载安装',
-    },
-  },
-  {
     id: 'ysp-live',
     name: '央视频全频道直播（YSP Live）',
     category: '直播',
@@ -660,48 +634,19 @@ function resolveParams(app, body) {
  * 先试官方源拉镜像；失败就依次换国内加速源。
  * 返回最终可用于 compose 的 image 引用（官方源不行时替换成加速源前缀）。
  */
-/** 判断 image 属于哪个镜像仓库（registry）。默认 Docker Hub。 */
-function registryOf(image) {
-  const first = String(image).split('/')[0];
-  if (first && (first.includes('.') || first.includes(':') || first === 'localhost')) {
-    if (first === 'docker.io' || first === 'index.docker.io') return 'docker.io';
-    return first;
-  }
-  return 'docker.io';
-}
-
-/**
- * 按 registry 构造拉取尝试序列：先官方源，再按对应的国内镜像源逐个兜底。
- * ghcr 等镜像会把「镜像源前缀」直接拼到仓库路径前（与 Docker 的地址转换一致）。
- */
-function buildAttempts(base) {
-  const reg = registryOf(base);
-  const attempts = [{ ref: base, host: reg === 'docker.io' ? '官方 Docker Hub' : reg, mirror: null }];
-  const mirrors = MIRRORS[reg] || [];
-  const rest = reg === 'docker.io' ? base : base.slice(reg.length + 1);
-  for (const m of mirrors) attempts.push({ ref: `${m}/${rest}`, host: m, mirror: m });
-  return attempts;
-}
-
 async function resolveImage(bin, app) {
   const base = app.image;
-  let attempts;
-  try {
-    attempts = buildAttempts(base);
-  } catch (err) {
-    attempts = [{ ref: base, host: '官方', mirror: null }];
-  }
+  const attempts = [
+    { ref: base, host: '官方', mirror: null },
+    ...MIRRORS.map((m) => ({ ref: m + '/' + base, host: m, mirror: m })),
+  ];
   const log = [];
 
   for (const attempt of attempts) {
-    const start = Date.now();
     const res = await run(bin, ['pull', attempt.ref], { timeout: PULL_TIMEOUT });
-    const elapsed = `${((Date.now() - start) / 1000).toFixed(1)}s`;
     const ok = res.code === 0;
-    const detail = ok
-      ? '成功'
-      : (res.stderr || res.stdout || '').trim().split('\n').slice(-2).join(' ').slice(0, 200) || '无法获取错误详情';
-    log.push(`${ok ? '✓' : '✗'} ${attempt.host}（${elapsed}）${ok ? '' : `: ${detail} [exit ${res.code}${res.timedOut ? ', 超时' : ''}]`}`);
+    const detail = (res.stderr || res.stdout || '').trim().split('\n').slice(-2).join(' ').slice(0, 160);
+    log.push(`${ok ? '✓' : '✗'} ${attempt.host}: ${ok ? '成功' : detail}, ${res.code}`);
     if (ok) {
       return {
         image: attempt.ref,
@@ -853,17 +798,6 @@ async function deploy(ctx) {
   // 先自动拉取镜像（官方源失败就逐个换加速源），用拉取成功的那份作为 compose 的 image，
   // 避免 compose up 时回头再拉官方源而超时。
   const resolved = await resolveImage(docker.bin, app);
-  if (resolved.host === '无法拉取') {
-    // 所有源（官方 + 国内镜像）都拉不到：直接报错并给出每个源的耗时和原因，
-    // 不再白等 compose up（那样会额外超时 2 分钟且信息更少）。
-    throw new HttpError(
-      500,
-      '镜像拉取失败：官方与所有国内镜像源都不可用',
-      '[镜像拉取记录]\n' + resolved.attempts.join('\n') +
-        '\n\n[最终镜像] ' + resolved.image +
-        '\n\n如果是 ghcr.io 镜像（PanSou / LibreTV / lxserver 等），部分加速源不代理 ghcr，可稍后再试或换网络。'
-    );
-  }
   const text = buildCompose({ ...app, image: resolved.image }, params);
 
   const dir = path.join(APPS_DIR, app.id);

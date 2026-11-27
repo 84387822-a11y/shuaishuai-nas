@@ -253,11 +253,27 @@ export function empty(text) {
 /* 交互                                                                */
 /* ------------------------------------------------------------------ */
 
+/**
+ * 桌面网关基址：后端在 HTML 里注入 <meta name="app-base">。
+ * TCP/Docker 直连时是空（走绝对路径）；网关前缀下是 /app/xxx。API 都要带上它。
+ */
+const APP_BASE = (() => {
+  let meta = null;
+  try { meta = document.head && document.head.querySelector('meta[name="app-base"]'); } catch { /* ignore */ }
+  const v = meta && meta.getAttribute('content');
+  return v ? v.replace(/[\/]+$/g, '') : '';
+})();
+
+/** 把以 / 开头的路径解析到当前基址下（网关前缀或根）。 */
+export function resolveApp(path) {
+  return APP_BASE + path;
+}
+
 export async function api(path, body) {
   const init = body === undefined
     ? {}
     : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
-  const res = await fetch(path, init);
+  const res = await fetch(resolveApp(path), init);
   let payload = null;
   try {
     payload = await res.json();
@@ -265,7 +281,7 @@ export async function api(path, body) {
     throw new Error(`服务返回异常（HTTP ${res.status}）`);
   }
   if (res.status === 401 && payload && payload.needLogin) {
-    location.href = '/login';
+    location.href = resolveApp('/login');
     throw new Error('需要登录');
   }
   if (!res.ok || payload.ok === false) {
@@ -279,7 +295,7 @@ export async function api(path, body) {
 
 /** POST 并直接触发浏览器下载（用于生成 HTML / 脚本 / CSV 等）。 */
 export async function apiDownload(path, body, fallbackName = 'download.txt') {
-  const res = await fetch(path, {
+  const res = await fetch(resolveApp(path), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body || {}),

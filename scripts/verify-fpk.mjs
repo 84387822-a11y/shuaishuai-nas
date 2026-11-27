@@ -153,15 +153,22 @@ function main() {
     if (width !== expect || height !== expect) fail(`${name} 尺寸应为 ${expect}×${expect}，实际 ${width}×${height}`);
   }
 
-  // ui/config 入口
+  // ui/config 入口（支持两种形态：url+端口直连 / iframe+gatewaySocket 桌面网关）
   const uiConfig = outer.get('ui/config');
   if (uiConfig) {
     try {
       const cfg = JSON.parse(uiConfig.data.toString('utf8'));
       const entry = cfg['.url'] && cfg['.url'][`${fields.appname}.main`];
-      if (!entry) fail('ui/config 缺少主入口');
-      else if (String(entry.port) !== String(fields.service_port)) fail('ui/config 端口与 manifest 不一致');
-      else notes.push(`入口 ${fields.appname}.main → :${entry.port}`);
+      if (!entry) {
+        fail('ui/config 缺少主入口');
+      } else if (entry.type === 'iframe' && entry.gatewaySocket) {
+        // 桌面网关形态：走 unix socket，不需要也没法对 TCP 端口
+        if (!entry.gatewayPrefix) fail('网关形态缺少 gatewayPrefix（如 /app/shuaishuai）');
+        else notes.push(`入口 ${fields.appname}.main → 桌面网关 ${entry.gatewayPrefix} (socket ${entry.gatewaySocket})`);
+      } else {
+        if (String(entry.port) !== String(fields.service_port)) fail('ui/config 端口与 manifest 不一致');
+        else notes.push(`入口 ${fields.appname}.main → :${entry.port}`);
+      }
     } catch (err) {
       fail(`ui/config 不是合法 JSON：${err.message}`);
     }
@@ -172,8 +179,9 @@ function main() {
   if (privilege) {
     try {
       const cfg = JSON.parse(privilege.data.toString('utf8'));
-      if (cfg.defaults && cfg.defaults['run-as'] === 'root') fail('不应默认以 root 运行');
-      else notes.push(`运行身份 ${cfg.defaults ? cfg.defaults['run-as'] : '未声明'}`);
+      // 桌面网关（fnOS）需在应用 target 目录建 unix socket，app 用户可能无写权限；
+      // 与牛管家一致，本应用允许以 root 运行。仅提示，不再判为失败。
+      notes.push(`运行身份 ${cfg.defaults ? cfg.defaults['run-as'] : '未声明'}${cfg.defaults && cfg.defaults['run-as'] === 'root' ? '（root：桌面网关建立 socket 需要；Docker/直连仍建议非 root）' : ''}`);
     } catch (err) {
       fail(`config/privilege 不是合法 JSON：${err.message}`);
     }
