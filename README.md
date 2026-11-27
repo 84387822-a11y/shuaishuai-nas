@@ -9,7 +9,7 @@
 Docker · 硬盘存储 · 文件管理 · 应用中心 · 监控 · 小工具
 ```
 
-![应用中心](docs/screenshots/01-apps-center.png)
+![监控仪表盘](docs/screenshots/01-monitor.png)
 
 ---
 
@@ -38,11 +38,11 @@ docker compose up -d
 把磁盘空间、内存占用、系统负载、硬盘 SMART、Docker 容器状态汇总成一张清单，按「正常 / 注意 / 异常」标出问题，不用逐个页面翻。
 > 只读。
 
+![一键体检](docs/screenshots/03-checkup.png)
+
 ### 系统清理
 扫描 Docker 悬空镜像、构建缓存、已停止容器、7 天前的系统日志与临时文件；顶部显示可释放总量，按卡片勾选（「安全」项默认选中、「需确认」项需手动勾选），清理前列出每条命令并要求确认。
 > 写入：仅删除勾选的清理项。
-
-![系统清理](docs/screenshots/02-cleanup.png)
 
 ### 网络诊断
 五个标签页：
@@ -78,6 +78,8 @@ CPU / 内存占用 Top 进程、启动失败的系统服务、监听端口；结
 预置常用自托管应用目录，选择数据目录与端口后一键生成并部署 Docker Compose，附 GitHub 版本检测。
 > 写入：生成 compose、创建容器。
 
+![应用中心](docs/screenshots/02-apps-center.png)
+
 ### 监控仪表盘
 CPU、内存、网络、磁盘 IO 实时曲线，磁盘信息与 SMART 摘要。
 
@@ -87,8 +89,6 @@ CPU、内存、网络、磁盘 IO 实时曲线，磁盘信息与 SMART 摘要。
 ### 设置 / 关于
 设置：主题（浅色/深色/跟随系统）、默认首页、紧凑模式、操作二次确认。
 关于：产品介绍、微信群/支付宝/QQ 群、版本检测与 Releases 入口。
-
-![设置](docs/screenshots/04-settings.png)
 
 ---
 
