@@ -25,19 +25,19 @@ NAS助手把这些收进一个页面：**能预览的绝不直接写，能只读
 
 ## 界面预览
 
-以下均为真实运行截图（无头浏览器渲染，非设计稿）：
+以下均为 v1.0.2 真实运行截图（非设计稿）：
 
-| 网络工具 |
+| 应用中心 · 一键部署 |
 | --- |
-| ![网络工具](docs/screenshots/02-network.png) |
+| ![应用中心](docs/screenshots/01-apps.png) |
 
-| 小工具 | 硬盘 SMART |
-| --- | --- |
-| ![小工具](docs/screenshots/03-tools.png) | ![硬盘 SMART](docs/screenshots/04-smart.png) |
-
-| 访问密码登录 |
+| 监控仪表盘 |
 | --- |
-| ![登录](docs/screenshots/05-login.png) |
+| ![监控仪表盘](docs/screenshots/02-monitor.png) |
+
+| 小工具 · 音乐转 MP3 |
+| --- |
+| ![小工具](docs/screenshots/03-tools.png) |
 
 ---
 
