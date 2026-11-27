@@ -6,3 +6,4 @@ dist/stage/
 *.log
 var/
 .env
+*.baiduyun.uploading.cfg
