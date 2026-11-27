@@ -16,7 +16,8 @@
     "verify:fpk": "node scripts/verify-fpk.mjs",
     "release": "node scripts/release.mjs",
     "icons": "python scripts/make-icons.py",
-    "test": "node scripts/selftest.mjs"
+    "test": "node scripts/selftest.mjs",
+    "push:api": "node scripts/push-via-api.mjs"
   },
   "dependencies": {},
   "devDependencies": {}
